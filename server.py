@@ -5,6 +5,8 @@ import sys
 import re
 import datetime
 import time
+import os
+import select
 
 serverPort = 0
 
@@ -19,7 +21,7 @@ serverName = "localhost"
 
 serverSocket = socket(AF_INET, SOCK_STREAM)
 serverSocket.bind(("", serverPort))
-serverSocket.listen(1)
+serverSocket.listen(10)
 
 print("Server has been setup.")
 
@@ -71,16 +73,18 @@ class HttpResponse:
 			return ""
 
 	def sendError(self, errnum):
-		message =  "HTTP/1.1 {0} {1}\r\nContent-Length: 0\r\n\r\n".format(errnum, self.reason(errnum))
+		tnow = time.gmtime()
+		tnowstr = time.strftime('%a, %d %b %Y %H:%M:%S %Z', tnow)
+		message =  "HTTP/1.1 {0} {1}\r\nContent-Length: 0\r\nDate: {2}\r\nServer: Kappa\r\n".format(errnum, self.reason(errnum), tnowstr)
 		raise RequestException(message)
 
 	def createResponse(self, resnum, headers):
-		tnow = time.gtime()
+		tnow = time.gmtime()
 		tnowstr = time.strftime('%a, %d %b %Y %H:%M:%S %Z', tnow)
 		message = "HTTP/1.1 {0} {1}\r\nDate: {2}\r\nServer: Kappa\r\n".format(resnum, self.reason(resnum), tnowstr)
 
 		for header in headers:
-			message += "{0}: {1}\r\n".format(header[0], header[1])
+			message += "{0}: {1}\r\n".format(header, headers[header])
 
 		message += "\r\n"
 
@@ -118,8 +122,6 @@ class Http:
 		validHeader = re.compile("(.+): (.+)")
 		headers = {}
 
-		# print(lines)
-
 		for line in lines:
 			match = validHeader.match(line)
 			if(not match):
@@ -129,7 +131,27 @@ class Http:
 				value = match.groups()[1]
 				headers[header] = value
 
+		if "Host" not in headers or "Connection" not in headers:
+			self.httpResponse.sendError(400)
+
 		return headers
+
+	def getContentType(self, filetype):
+		if(len(filetype) == 0):
+			print("Should not have validated this type!")
+			self.httpResponse.sendError(500)
+
+		cleanType = filetype[1:].lower()
+
+		if(cleanType == "jpg" or cleanType == "jpeg" or cleanType == "png" or cleanType == "gif" or cleanType == "bmp"):
+			return "image/" + cleanType
+		elif(cleanType == "html" or cleanType == "htm"):
+			return "text/" + cleanType
+		elif(cleanType == "txt"):
+			return "text/plain"
+		else:
+			return "text/plain; charset=us-ascii"
+
 
 	# Handles the request. Returns a tuple for the response and content body
 	def handleRequest(self, requestLine, headers, body):
@@ -142,16 +164,22 @@ class Http:
 			if(uri == "/"):
 				uri = "/index.html"
 
+			# This may be extended to allow absolute paths later
+			relativeUri = "." + uri
+
 			try:
-				inputFile = open("." + uri, 'rb')
+				inputFile = open(relativeUri, 'rb')
 			except IOError:
 				self.httpResponse.sendError(404)
+
+			fileName, fileExtension = os.path.splitext(relativeUri)
 
 			contents = inputFile.read()
 			inputFile.close()
 
 			responseHeaders = {}
 			responseHeaders["Content-Length"] = len(contents)
+			responseHeaders["Content-Type"] = self.getContentType(fileExtension)
 
 			response.append(self.httpResponse.createResponse(200, responseHeaders))
 			response.append(contents)
@@ -194,17 +222,22 @@ httpObj = Http()
 while(1):
 	connectionSocket, addr = serverSocket.accept()
 
-	data = connectionSocket.recv(8192)
+	connectionSocket.setblocking(0)
+
+	ready = select.select([connectionSocket], [], [], 10)
+	if ready[0]:
+		try:
+			data = connectionSocket.recv(8192)
+		except Exception as e:
+			connectionSocket.close()
+			break
+	else:
+		continue
 
 	request = data.decode()
 
 	print("Request:")
 	print(request)
-
-	# Helpful debug information
-	# print(addr)
-	# print("Message Recieved:")
-	# print(request)
 
 	try:
 		response = httpObj.parseHttp(request)
