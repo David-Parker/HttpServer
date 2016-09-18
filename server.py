@@ -51,6 +51,9 @@ def getTime(timeString):
 						return None
 	return date
 
+def getHeader(header):
+	return header.lower()
+
 class RequestException(Exception):
 	pass
 
@@ -134,11 +137,11 @@ class Http:
 			if(not match):
 				self.httpResponse.sendError(400)
 			else:
-				header = match.groups()[0]
+				header = getHeader(match.groups()[0])
 				value = match.groups()[1]
 				headers[header] = value
 
-		if "Host" not in headers:
+		if getHeader("Host") not in headers:
 			self.httpResponse.sendError(400)
 
 		return headers
@@ -182,10 +185,9 @@ class Http:
 			fileName, fileExtension = os.path.splitext(relativeUri)
 			lastModifiedDate = datetime.fromtimestamp(os.path.getmtime(relativeUri))
 			lastModifiedDateStr = lastModifiedDate.strftime(dateFormatString)
-			print(lastModifiedDateStr)
 
-			if "If-Modified-Since" in headers:
-				headerTime = getTime(headers["If-Modified-Since"])
+			if getHeader("If-Modified-Since") in headers:
+				headerTime = getTime(headers[getHeader("If-Modified-Since")])
 				lastModifiedTime = getTime(lastModifiedDateStr)
 
 				if(not headerTime or not lastModifiedTime):
@@ -200,9 +202,9 @@ class Http:
 			inputFile.close()
 
 			responseHeaders = {}
-			responseHeaders["Content-Length"] = len(contents)
-			responseHeaders["Content-Type"] = self.getContentType(fileExtension)
-			responseHeaders["Last-Modified"] = lastModifiedDateStr
+			responseHeaders[getHeader("Content-Length")] = len(contents)
+			responseHeaders[getHeader("Content-Type")] = self.getContentType(fileExtension)
+			responseHeaders[getHeader("Last-Modified")] = lastModifiedDateStr
 
 			response.append(self.httpResponse.createResponse(200, responseHeaders))
 			response.append(contents)
