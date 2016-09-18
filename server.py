@@ -138,7 +138,7 @@ class Http:
 				value = match.groups()[1]
 				headers[header] = value
 
-		if "Host" not in headers or "Connection" not in headers:
+		if "Host" not in headers:
 			self.httpResponse.sendError(400)
 
 		return headers
@@ -211,8 +211,6 @@ class Http:
 			self.httpResponse.sendError(501)
 
 		return []
-
-
 
 	def parseHttp(self, request):
 		lines = request.split('\r\n')
