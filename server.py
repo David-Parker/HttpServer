@@ -3,12 +3,13 @@
 from socket import *
 import sys
 import re
-import datetime
+from datetime import datetime
 import time
 import os
-import select
+# import select
 
 serverPort = 0
+dateFormatString = "%a, %d %b %Y %H:%M:%S %Z"
 
 # Read the port number from the command line argument
 if(len(sys.argv) != 2):
@@ -33,15 +34,21 @@ print("Server has been setup.")
 def getTime(timeString):
 	date = None
 	try:
-		date = time.strptime(timeString, '%a, %d %b %Y %H:%M:%S %Z')
+		date = time.strptime(timeString, dateFormatString)
 	except ValueError:
 		try:
 			date = time.strptime(timeString)
 		except ValueError:
 			try:
-				date = time.strptime(timeString, '%A, %d-%b-%y %H:%M:%S %Z')
+				date = time.strptime(timeString, "%A, %d-%b-%y %H:%M:%S %Z")
 			except ValueError:
-				return None
+				try:
+					date = time.strptime(timeString, "%a, %d %b %Y %H:%M:%S")
+				except ValueError:
+					try:
+						date = time.strptime(timeString[:-1], "%a, %d %b %Y %H:%M:%S")
+					except ValueError:
+						return None
 	return date
 
 class RequestException(Exception):
@@ -74,13 +81,13 @@ class HttpResponse:
 
 	def sendError(self, errnum):
 		tnow = time.gmtime()
-		tnowstr = time.strftime('%a, %d %b %Y %H:%M:%S %Z', tnow)
+		tnowstr = time.strftime(dateFormatString, tnow)
 		message =  "HTTP/1.1 {0} {1}\r\nContent-Length: 0\r\nDate: {2}\r\nServer: Kappa\r\n".format(errnum, self.reason(errnum), tnowstr)
 		raise RequestException(message)
 
 	def createResponse(self, resnum, headers):
 		tnow = time.gmtime()
-		tnowstr = time.strftime('%a, %d %b %Y %H:%M:%S %Z', tnow)
+		tnowstr = time.strftime(dateFormatString, tnow)
 		message = "HTTP/1.1 {0} {1}\r\nDate: {2}\r\nServer: Kappa\r\n".format(resnum, self.reason(resnum), tnowstr)
 
 		for header in headers:
@@ -173,6 +180,21 @@ class Http:
 				self.httpResponse.sendError(404)
 
 			fileName, fileExtension = os.path.splitext(relativeUri)
+			lastModifiedDate = datetime.fromtimestamp(os.path.getmtime(relativeUri))
+			lastModifiedDateStr = lastModifiedDate.strftime(dateFormatString)
+			print(lastModifiedDateStr)
+
+			if "If-Modified-Since" in headers:
+				headerTime = getTime(headers["If-Modified-Since"])
+				lastModifiedTime = getTime(lastModifiedDateStr)
+
+				if(not headerTime or not lastModifiedTime):
+					self.httpResponse.sendError(400)
+
+				# The server has an older copy, don't update
+				if(lastModifiedTime <= headerTime):
+					self.httpResponse.sendError(304)
+
 
 			contents = inputFile.read()
 			inputFile.close()
@@ -180,6 +202,7 @@ class Http:
 			responseHeaders = {}
 			responseHeaders["Content-Length"] = len(contents)
 			responseHeaders["Content-Type"] = self.getContentType(fileExtension)
+			responseHeaders["Last-Modified"] = lastModifiedDateStr
 
 			response.append(self.httpResponse.createResponse(200, responseHeaders))
 			response.append(contents)
@@ -220,19 +243,23 @@ class Http:
 httpObj = Http()
 
 while(1):
+	# connectionSocket, addr = serverSocket.accept()
+
+	# connectionSocket.setblocking(0)
+
+	# ready = select.select([connectionSocket], [], [], 10)
+	# if ready[0]:
+	# 	try:
+	# 		data = connectionSocket.recv(8192)
+	# 	except Exception as e:
+	# 		connectionSocket.close()
+	# 		break
+	# else:
+	# 	continue
+
 	connectionSocket, addr = serverSocket.accept()
 
-	connectionSocket.setblocking(0)
-
-	ready = select.select([connectionSocket], [], [], 10)
-	if ready[0]:
-		try:
-			data = connectionSocket.recv(8192)
-		except Exception as e:
-			connectionSocket.close()
-			break
-	else:
-		continue
+	data = connectionSocket.recv(8192)
 
 	request = data.decode()
 
@@ -249,8 +276,8 @@ while(1):
 		response = str(e)
 		connectionSocket.send(response.encode())
 		print("Reponse: " + response)
-	except Exception as e:
-		print(str(e))
+	# except Exception as e:
+	# 	print(str(e))
 
 	connectionSocket.close()
 	print("Connection closed")
