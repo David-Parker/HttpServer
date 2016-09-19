@@ -218,9 +218,9 @@ class Http:
 			inputFile.close()
 
 			responseHeaders = {}
-			responseHeaders[getHeader("Content-Length")] = len(contents)
-			responseHeaders[getHeader("Content-Type")] = self.getContentType(fileExtension)
-			responseHeaders[getHeader("Last-Modified")] = lastModifiedDateStr
+			responseHeaders["Content-Length"] = len(contents)
+			responseHeaders["Content-Type"] = self.getContentType(fileExtension)
+			responseHeaders["Last-Modified"] = lastModifiedDateStr
 
 			# The response is returned as a tuple. The first value being the response header, the second being the content of the requested file (if it exists)
 			response.append(self.httpResponse.createResponse(200, responseHeaders))
