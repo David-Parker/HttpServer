@@ -26,7 +26,7 @@ tests = {
 		 "GET /index.html HTTP/1.1\r\nhOsT: www.cs.utexas.edu\r\n\r\n": 200,
 		 "GeT /index.html HTTP/1.1\r\nhOsT: www.cs.utexas.edu\r\n\r\n": 501,
 		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:09 GMT\r\n\r\n": 304,
-		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:10 GMT\r\n\r\n": 200,
+		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:10 GMT\r\n\r\n": 304,
 		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:08 GMT\r\n\r\n": 200
 		 }
 

@@ -210,8 +210,8 @@ class Http:
 				if(not lastModifiedTime):
 					self.httpResponse.sendError(500)
 
-				# The server and client copy are sync'd, don't send the file
-				if(lastModifiedTime == headerTime):
+				# The server has an older copy, don't update
+				if(lastModifiedTime <= headerTime):
 					self.httpResponse.sendError(304)
 
 			contents = inputFile.read()
