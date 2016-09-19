@@ -1,4 +1,5 @@
 # server.py
+# EID: dp24559
 
 from socket import *
 import sys
@@ -6,7 +7,6 @@ import re
 from datetime import datetime
 import time
 import os
-# import select
 
 serverPort = 0
 dateFormatString = "%a, %d %b %Y %H:%M:%S %Z"
@@ -76,6 +76,7 @@ class HttpResponse:
 		reasons[501] = "Not Implemented"
 		reasons[502] = "Bad Gateway"
 		reasons[505] = "HTTP Version Not Supported"
+		reasons[408] = "Request Timeout"
 
 		if resnum in reasons:
 			return reasons[resnum]
@@ -85,13 +86,13 @@ class HttpResponse:
 	def sendError(self, errnum):
 		tnow = time.gmtime()
 		tnowstr = time.strftime(dateFormatString, tnow)
-		message =  "HTTP/1.1 {0} {1}\r\nContent-Length: 0\r\nDate: {2}\r\nServer: Kappa\r\n".format(errnum, self.reason(errnum), tnowstr)
+		message =  "HTTP/1.1 {0} {1}\r\nContent-Length: 0\r\nDate: {2}\r\nServer: Kappa/0.0.1\r\n".format(errnum, self.reason(errnum), tnowstr)
 		raise RequestException(message)
 
 	def createResponse(self, resnum, headers):
 		tnow = time.gmtime()
 		tnowstr = time.strftime(dateFormatString, tnow)
-		message = "HTTP/1.1 {0} {1}\r\nDate: {2}\r\nServer: Kappa\r\n".format(resnum, self.reason(resnum), tnowstr)
+		message = "HTTP/1.1 {0} {1}\r\nDate: {2}\r\nServer: Kappa/0.0.1\r\n".format(resnum, self.reason(resnum), tnowstr)
 
 		for header in headers:
 			message += "{0}: {1}\r\n".format(header, headers[header])
@@ -184,7 +185,7 @@ class Http:
 
 			fileName, fileExtension = os.path.splitext(relativeUri)
 			lastModifiedDate = datetime.fromtimestamp(os.path.getmtime(relativeUri))
-			lastModifiedDateStr = lastModifiedDate.strftime(dateFormatString)
+			lastModifiedDateStr = lastModifiedDate.strftime(dateFormatString) + "GMT"
 
 			if getHeader("If-Modified-Since") in headers:
 				headerTime = getTime(headers[getHeader("If-Modified-Since")])
@@ -193,10 +194,9 @@ class Http:
 				if(not headerTime or not lastModifiedTime):
 					self.httpResponse.sendError(400)
 
-				# The server has an older copy, don't update
-				if(lastModifiedTime <= headerTime):
+				# The server and client copy are sync'd, don't send the file
+				if(lastModifiedTime == headerTime):
 					self.httpResponse.sendError(304)
-
 
 			contents = inputFile.read()
 			inputFile.close()
@@ -215,6 +215,9 @@ class Http:
 		return []
 
 	def parseHttp(self, request):
+		if(len(request) == 0):
+			self.httpResponse.sendError(400)
+
 		lines = request.split('\r\n')
 
 		if(len(lines) < 3):
@@ -243,23 +246,16 @@ class Http:
 httpObj = Http()
 
 while(1):
-	# connectionSocket, addr = serverSocket.accept()
-
-	# connectionSocket.setblocking(0)
-
-	# ready = select.select([connectionSocket], [], [], 10)
-	# if ready[0]:
-	# 	try:
-	# 		data = connectionSocket.recv(8192)
-	# 	except Exception as e:
-	# 		connectionSocket.close()
-	# 		break
-	# else:
-	# 	continue
 
 	connectionSocket, addr = serverSocket.accept()
+	connectionSocket.settimeout(5)
 
-	data = connectionSocket.recv(8192)
+	try:
+		data = connectionSocket.recv(8192)
+	except timeout:
+		connectionSocket.send(httpObj.httpResponse.createResponse(408, {}).encode())
+		connectionSocket.close()
+		continue
 
 	request = data.decode()
 
@@ -276,8 +272,8 @@ while(1):
 		response = str(e)
 		connectionSocket.send(response.encode())
 		print("Reponse: " + response)
-	# except Exception as e:
-	# 	print(str(e))
+	except Exception as e:
+		print(str(e))
 
 	connectionSocket.close()
 	print("Connection closed")
