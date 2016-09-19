@@ -57,6 +57,7 @@ def getHeader(header):
 class RequestException(Exception):
 	pass
 
+# Class is used for easily and automatically generating valid HTTP/1.1 responses
 class HttpResponse:
 	def reason(self, resnum):
 		reasons = {}
@@ -83,12 +84,14 @@ class HttpResponse:
 		else:
 			return ""
 
+	# Generate an error response
 	def sendError(self, errnum):
 		tnow = time.gmtime()
 		tnowstr = time.strftime(dateFormatString, tnow)
 		message =  "HTTP/1.1 {0} {1}\r\nContent-Length: 0\r\nDate: {2}\r\nServer: Kappa/0.0.1\r\n".format(errnum, self.reason(errnum), tnowstr)
 		raise RequestException(message)
 
+	# Generate a valid response with the specified response number and given headers
 	def createResponse(self, resnum, headers):
 		tnow = time.gmtime()
 		tnowstr = time.strftime(dateFormatString, tnow)
@@ -101,6 +104,7 @@ class HttpResponse:
 
 		return message
 
+# Class is used to create an HTTP server. Responsible for parsing requests and generating responses.
 class Http:
 	requestLine = []
 	headers = {}
@@ -142,6 +146,7 @@ class Http:
 				value = match.groups()[1]
 				headers[header] = value
 
+		# Host is a required header in HTTP/1.1
 		if getHeader("Host") not in headers:
 			self.httpResponse.sendError(400)
 
@@ -152,6 +157,7 @@ class Http:
 			print("Should not have validated this type!")
 			self.httpResponse.sendError(500)
 
+		# removes the leading . and converts the file to all lowercase
 		cleanType = filetype[1:].lower()
 
 		if(cleanType == "jpg" or cleanType == "jpeg" or cleanType == "png" or cleanType == "gif" or cleanType == "bmp"):
@@ -184,15 +190,25 @@ class Http:
 				self.httpResponse.sendError(404)
 
 			fileName, fileExtension = os.path.splitext(relativeUri)
+
+			# Converts the modified time from an integer time stamp from UNIX epoch to a datetime
 			lastModifiedDate = datetime.fromtimestamp(os.path.getmtime(relativeUri))
+
+			# getmtime returns time in UTC/GMT but does not specifiy the timezone, so we should add it to our response
 			lastModifiedDateStr = lastModifiedDate.strftime(dateFormatString) + "GMT"
 
+			# Conditional GET
 			if getHeader("If-Modified-Since") in headers:
 				headerTime = getTime(headers[getHeader("If-Modified-Since")])
 				lastModifiedTime = getTime(lastModifiedDateStr)
 
-				if(not headerTime or not lastModifiedTime):
+				# The user sent a time in an unrecognized format
+				if(not headerTime):
 					self.httpResponse.sendError(400)
+
+				# We generated an incorrect time format from the os.path modified time, this was our fault
+				if(not lastModifiedTime):
+					self.httpResponse.sendError(500)
 
 				# The server and client copy are sync'd, don't send the file
 				if(lastModifiedTime == headerTime):
@@ -206,6 +222,7 @@ class Http:
 			responseHeaders[getHeader("Content-Type")] = self.getContentType(fileExtension)
 			responseHeaders[getHeader("Last-Modified")] = lastModifiedDateStr
 
+			# The response is returned as a tuple. The first value being the response header, the second being the content of the requested file (if it exists)
 			response.append(self.httpResponse.createResponse(200, responseHeaders))
 			response.append(contents)
 			return response
