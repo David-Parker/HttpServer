@@ -128,6 +128,14 @@ class Http:
 
 		# Parse the version
 		version = sections[2]
+		versionRegex = re.compile("HTTP\/([0-9]+).([0-9]+)")
+
+		print("Version:")
+		print(version)
+
+		if(not versionRegex.match(version)):
+			self.httpResponse.sendError(400)
+
 		if(version != "HTTP/1.1"):
 			self.httpResponse.sendError(505)
 
