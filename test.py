@@ -2,8 +2,9 @@
 
 from socket import *
 import re
+import sys
 serverName = 'localhost'
-serverPort = 24559
+serverPort = int(sys.argv[1])
 
 tests = {
 		# "": 408,
@@ -32,7 +33,9 @@ tests = {
 		 "GeT /index.html HTTP/1.1\r\nhOsT: www.cs.utexas.edu\r\n\r\n": 501,
 		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:09 GMT\r\n\r\n": 304,
 		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:10 GMT\r\n\r\n": 304,
-		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:08 GMT\r\n\r\n": 200
+		 "GET /index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:08 GMT\r\n\r\n": 200,
+		 "GET index.html HTTP/1.1\r\nHost: www.cs.utexas.edu\r\nIf-Modified-Since: Mon, 19 Sep 2016 16:17:08 GMT\r\n\r\n": 200,
+		 "GET index.html HTTP/1.1\r\nhOsT: www.cs.utexas.edu\r\n\r\n": 200,
 		 }
 
 for test in tests:
@@ -54,7 +57,10 @@ for test in tests:
 			print("Got: " + str(status))
 			print("Expected: " + str(tests[test]))
 	else:
-		print("Fail! The response header was malformed.")	
+		print("Fail! The response header was malformed.\n Test: ")
+		print(test)
+		print("****************************")
+		print("****************************")
 
 	# print(recievedMessage)
 	print("****************************")

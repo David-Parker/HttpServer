@@ -189,6 +189,8 @@ class Http:
 			if(uri == "/"):
 				uri = "/index.html"
 
+			if(len(uri) > 0 and uri[0] != "/"): uri = "/" + uri
+
 			# This may be extended to allow absolute paths later
 			relativeUri = "." + uri
 
